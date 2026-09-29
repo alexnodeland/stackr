@@ -94,7 +94,7 @@ It talks to stackr's ports only, through the settings in `.env` ([`settings.py`]
 The app profile ([`compose.yaml`](compose.yaml)) joins the stack's networks and reaches its services by name; `STACK_DATABASE_URL` points it at another database there.
 {%- if use_reflexr %}
 
-When the application stops, reflexr's reactor starts no new runs and gives the running ones 5 seconds to end (`STOP_GRACE` in [`automation.py`](src/{{ package_name }}/automation.py)), within the 10 seconds the app profile allows a stop (`stop_grace_period`). A run still going then is recorded as an abandoned attempt, and the next start retries it after its rule's backoff.
+When the application stops, reflexr's reactor starts no new runs and gives the running ones `STOP_GRACE` to end ([`automation.py`](src/{{ package_name }}/automation.py)), within the app profile's `stop_grace_period`. A run still going then is recorded as an abandoned attempt, and the next start retries it after its rule's backoff.
 {%- endif %}
 {%- if evals %}
 

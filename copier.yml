@@ -67,11 +67,9 @@ app_port:
   validator: >-
     {% if app_port < 1024 or app_port > 65535 %}Choose a port from 1024 to 65535{% endif %}
 
-# The libraries' revisions (ADR-0013): never asked and not recorded in the answers, so `copier
-# update` moves them with the template code written for them. The libraries are not on PyPI, so
-# each is pinned to a commit of its repository; in stackr, `make bump-libraries` moves these to
-# each library's `main`. evalr comes with the libraries, at the commit their own sources pin. An
-# application holds a library back by editing its rev in pyproject.toml.
+# Never asked, and not recorded in the answers. The libraries' commits are the template's, so
+# `copier update` moves them with its code; `make bump-libraries` moves them to each library's
+# main, and evalr comes with them (ADR-0013). The rest are derived from the answers.
 artifactr_rev:
   type: str
   default: 6ec0bcebfb0b74088976da08a3632018f35b7f68
@@ -82,7 +80,6 @@ reflexr_rev:
   default: 2f28e23d3ca1451d2d76fbf149b49f4363524f19
   when: false
 
-# Derived, never asked, and not recorded in the answers.
 package_name:
   type: str
   default: "{{ project_slug | replace('-', '_') }}"

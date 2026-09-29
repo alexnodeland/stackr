@@ -2,7 +2,7 @@
 
 Producers publish events with a Supabase access token; the tenant and user come from it. The
 reactor evaluates the rules and runs their actions while the application is up, and stops
-gracefully when it stops.
+gracefully with it.
 """
 
 import asyncio
@@ -45,8 +45,8 @@ from {{ package_name }}.tickets import (
 PREFIX = "/reflexr"
 
 STOP_GRACE = timedelta(seconds=5)
-"""How long running actions have to end when the application stops: less than the 10 seconds
-the app profile gives it to stop (``stop_grace_period`` in ``compose.yaml``)."""
+"""How long running actions have to end when the application stops, within the budget ``DRAIN``
+in ``app.py`` states."""
 
 
 class Automation:
@@ -161,7 +161,7 @@ class Automation:
     async def _resolve_client(
         self, ctx: Context[Any, Request]
     ) -> tuple[TenantId, ExternalAgentActor]:
-        # Over HTTP, the call's request is Starlette's, as artifactr's McpContext types it.
+        # reflexr types the request as Any; over HTTP it is Starlette's (reflexr#78).
         request = ctx.request_context.request  # None for a client in process, without a token
         if request is None:
             raise ToolError("connect over HTTP")

@@ -43,6 +43,12 @@ from {{ package_name }}.telemetry import TelemetryHandle, configure
 TITLE = {{ project_name | tojson }}
 DISTRIBUTION = "{{ project_slug }}"
 
+DRAIN = 2
+"""Seconds the server lets open requests finish when the application stops, before it cancels
+them and the lifespan shuts down. {% if use_reflexr %}``DRAIN``, the reactor's ``STOP_GRACE`` and the rest of the
+shutdown must end within the app profile's ``stop_grace_period``.{% else %}``DRAIN`` and the rest of the shutdown must end within
+the time the platform gives a stopping process.{% endif %}"""
+
 
 class Part(Protocol):
     """One library's surfaces, mounted under a prefix of its own."""
@@ -163,7 +169,10 @@ def main() -> None:
     telemetry = configure(settings)
     try:
         uvicorn.run(
-            create_app(settings, telemetry=telemetry), host=settings.host, port=settings.port
+            create_app(settings, telemetry=telemetry),
+            host=settings.host,
+            port=settings.port,
+            timeout_graceful_shutdown=DRAIN,
         )
     finally:
         if telemetry is not None:

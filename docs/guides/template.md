@@ -91,7 +91,7 @@ The **app profile** is the application's own `compose.yaml`, not a service in st
 
 So start the stack first, with local Supabase: stackr's default `make up`. The image is built in two stages, the first with git to fetch the libraries at their pinned commits, so building it needs the network.
 
-**Stopping** gives the application 10 seconds from `SIGTERM` (`stop_grace_period`, Docker's default, stated in the compose file). With reflexr, the reactor stops first, before the database closes, and never in the middle of a transaction: it starts no new runs, and gives running actions `STOP_GRACE` (5 seconds, in `automation.py`) to end. An action still running then is cancelled between its storage calls, its attempt recorded as abandoned, and its lease let go, so the next start retries the run after its rule's backoff ([reflexr's graceful stop](https://github.com/alexnodeland/reflexr/blob/main/docs/guides/reactor.md#running-the-reactor)). Keep the grace below the stop period, less the rest of the shutdown; `create_app(grace=...)` sets another.
+**Stopping:** the server lets open requests finish for `DRAIN`, then the reactor stops before the database closes, giving running actions `STOP_GRACE` to end and recording those it then cancels as abandoned attempts, which the next start retries ([reflexr's graceful stop](https://github.com/alexnodeland/reflexr/blob/main/docs/guides/reactor.md#running-the-reactor)). Together, and with the rest of the shutdown, they must end within the app profile's `stop_grace_period`.
 
 The **dev container** is built on `.devcontainer/compose.yaml`. When the stack is running, its `initialize.sh` adds the stack's networks and the same addresses, so the application inside it reaches the stack by name; otherwise the dev container runs on its own.
 
@@ -109,9 +109,9 @@ pulls in the template's improvements since the application was generated, keepin
 
 artifactr and reflexr are pinned to commits in `pyproject.toml`'s `[tool.uv.sources]` ([ADR-0013](../adr/0013-how-the-template-pins-the-libraries.md)). The pins are the template's, not answers, so `copier update` moves them with the template code written for them. evalr has no pin of its own: it comes with the libraries, at the commit their own `[tool.uv.sources]` pin.
 
-To hold a library back, or try another commit, edit its `rev` there, then `uv lock && make check`. `copier update` keeps the edit, and marks a conflict when the template moves the same pin.
+To hold a library back, or try another commit, edit its `rev` there, then `uv lock && make check`. `copier update` keeps the edit, and marks a conflict when the template moves that pin or the other library's, on the line beside it.
 
-### In stackr: bumping the template's defaults
+### In stackr: bumping the template's pins
 
 The libraries install from GitHub rather than PyPI for now ([artifactr#23](https://github.com/alexnodeland/artifactr/issues/23)), so the template's pins, `artifactr_rev` and `reflexr_rev` in `copier.yml`, follow each library's `main` by hand. `make bump-libraries` does it:
 

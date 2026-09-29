@@ -31,7 +31,7 @@ Dependabot doesn't read this file. To bump a pin, change it here, then run `make
 
 ## The template's library revisions
 
-The libraries aren't on PyPI yet, so the application template pins artifactr and reflexr each to a commit of its repository: each library's `main` when the template was last updated. evalr comes with them, at the commit their own sources pin. `make bump-libraries` moves the pins to each library's current `main` and regenerates this table, and `make bump-libraries BUMP_FLAGS=--check` fails when one is behind ([bumping the template's defaults](../guides/template.md#in-stackr-bumping-the-templates-defaults)). An application moves to them with `copier update` ([The application template](../guides/template.md#the-libraries-revisions)).
+The libraries aren't on PyPI yet, so the application template pins artifactr and reflexr each to a commit of its repository: each library's `main` when the template was last updated. evalr comes with them, at the commit their own sources pin. `make bump-libraries` moves the pins to each library's current `main` and regenerates this table, and `make bump-libraries BUMP_FLAGS=--check` fails when one is behind ([bumping the template's pins](../guides/template.md#in-stackr-bumping-the-templates-pins)). An application moves to them with `copier update` ([The application template](../guides/template.md#the-libraries-revisions)).
 
 <!-- generated: template-revisions -->
 
