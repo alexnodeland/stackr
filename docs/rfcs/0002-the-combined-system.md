@@ -1,9 +1,9 @@
 # RFC-0002: The combined system
 
-**Status:** Discussion
+**Status:** Accepted
 **Author:** Alex Nodeland
 **Created:** 2026-09-29
-**Discussion:** [#30](https://github.com/alexnodeland/stackr/pull/30), from [issue #8](https://github.com/alexnodeland/stackr/issues/8)
+**Discussion:** [#30](https://github.com/alexnodeland/stackr/pull/30), from [issue #8](https://github.com/alexnodeland/stackr/issues/8); accepted on 2026-09-29, with the decisions in [Decision points](#decision-points)
 **Siblings:**
 
 - [reflexr ADR-0003][r-adr-0003] keeps the libraries independent and leaves the adapters between them to this system. [artifactr ADR-0032][a-adr-0032] makes it an application built from stackr's template.
@@ -16,7 +16,7 @@ The combined system is a chat and artifact workspace (artifactr), an event and r
 
 This RFC proposes a **bridge**: a small package with two adapters over the libraries' public APIs. The inbound adapter turns selected artifactr events into reflexr events. The outbound adapter lets reflexr runs act in artifactr, mostly by proposing changes for people to review. The RFC also covers delivery guarantees, loop control, sessions and traces, rules drafted in chat, evaluation and security.
 
-Seven decisions (D1 to D7) need the maintainer's answer before any code is written. Each one has a recommendation.
+The maintainer settled seven decisions (D1 to D7) on 2026-09-29. The bridge is **relayr**, a new sibling repository, and its event names wait for [reflexr #45][r-45] (D6).
 
 ## Motivation
 
@@ -77,7 +77,7 @@ The bridge runs inside the application's process, next to both libraries. Neithe
 
 ### Where the code lives
 
-The bridge is a new package that depends on both libraries (**D1** covers where it lives and its name; `bridgr` is the working name here). It holds:
+The bridge is a new package that depends on both libraries (**D1**: a new sibling repository, **relayr**). It holds:
 
 - the two adapters
 - the bridged event types
@@ -108,7 +108,7 @@ The bridge has two ports of its own. The **ledger** is storage: an in-memory ada
 
 - **One follower per workspace.** It holds a lease in the ledger, so only one process follows each workspace. It reads envelopes in `seq` order and publishes the selected ones into the reflexr workspace with the same tenant and id. Only then does it advance its cursor.
 - **Ids come from the artifactr envelope id,** so publishing an event twice appends nothing (reflexr's `publish` is idempotent by id).
-- **Names carry a prefix,** such as `artifactr.message_posted`. reflexr's registry is process-global with flat names, and its own facts `run_started` and `feedback_given` would collide with artifactr's. The prefix stays until [reflexr #45][r-45] settles namespaces (**D6**).
+- **Names come from reflexr's namespaces.** reflexr's registry is process-global with flat names, and its own facts `run_started` and `feedback_given` would collide with artifactr's. [reflexr #45][r-45] decides how event types are namespaced before phase 1 starts (**D6**), and the bridged types use its scheme. This RFC writes them as `artifactr.message_posted` and so on, as placeholders.
 - **The actor** on each bridged envelope is `SourceActor("artifactr")`, since the bridge published it. The artifactr actor goes in an `author` field, so rules can filter on who did it.
 
 The default set:
@@ -174,7 +174,7 @@ Five mechanisms keep them in check:
 
 ### Chains and threads
 
-A thread is a conversation that can run for weeks. A chain is one causal story, from a first event to everything it caused. Proposed (**D3**): **a thread is never a chain.**
+A thread is a conversation that can run for weeks. A chain is one causal story, from a first event to everything it caused. Decided (**D3**): **a thread is never a chain.**
 
 - Each bridged event from a person starts a chain of its own, as any source event does.
 - A chain that begins with a thread event carries the thread id as a field and as a `thread:` tag.
@@ -191,7 +191,7 @@ Today, each library has its own idea of a session:
 | Langfuse user | who requested the turn, if a user | the last matched event's actor, if a user |
 | Tags | tenant, workspace, the kinds of artifact in focus | tenant, workspace, rule |
 
-Proposed (**D4**): **the sessions are linked, not continued.**
+Decided (**D4**): **the sessions are linked, not continued.**
 
 - **Separate traces and sessions,** with links between them. A chain does not join the thread's Langfuse session.
 - **reflexr to artifactr works today.** Bridge commands run inside the run's span, so proposals and revisions record the run's trace ([artifactr ADR-0033][a-adr-0033]). A turn started by a bridge message is a new trace, linked to the run's span (artifactr ADR-0035).
@@ -229,7 +229,7 @@ Changing the rule means another proposal on the artifact, which installs a new v
 
 **Audit** spans both logs. artifactr's log holds the draft, the proposal and the acceptance. reflexr's store holds the installed versions, and each version records the artifactr ids it came from.
 
-**D5** decides which one is the source of truth. Proposed: the artifact is the reviewed record, and reflexr's store holds the running definition. If the rule is changed in reflexr directly, for example by an operator, the bridge proposes the same change to the artifact, so the two don't drift apart silently.
+**D5** decides which one is the source of truth. Decided: the artifact is the reviewed record, and reflexr's store holds the running definition. If the rule is changed in reflexr directly, for example by an operator, the bridge proposes the same change to the artifact, so the two don't drift apart silently.
 
 ### Evaluation
 
@@ -273,33 +273,35 @@ When `libraries` is `both`, a new `bridge` question (yes by default) adds:
 
 ## Decision points
 
-| # | Decision | Recommendation |
+The maintainer decided these on 2026-09-29. Each option table below marks the choice in bold.
+
+| # | Decision | Decided |
 |---|---|---|
-| D1 | Where the bridge lives, and its name | A new sibling repository and package, working name `bridgr` |
+| D1 | Where the bridge lives, and its name | A new sibling repository and package, named **relayr** |
 | D2 | The outbound actor | `ExternalAgentActor(client_id="reflexr:<rule>")`, one participant per rule |
 | D3 | Chains and threads | A thread is never a chain; chains carry the thread as a field and tag |
 | D4 | Sessions: linked or continued | Linked, not continued |
 | D5 | Where a rule's source of truth lives | The artifact is the reviewed record; reflexr's store holds the running definition |
-| D6 | Bridged event names before reflexr #45 | An `artifactr.` prefix now, moved to #45's namespaces when they land |
+| D6 | Bridged event names before reflexr #45 | Decide #45 first; phase 1 waits for it, and uses its namespaces |
 | D7 | May a rule start a turn? | Notices by default; starting a turn is a per-rule permission |
 
 ### D1: where the bridge lives, and its name
 
 | Option | For | Against |
 |---|---|---|
-| **A new sibling repository and package (recommended)** | Its own tests, releases and pinned revision, like the libraries. Any application from the template can use it | One more repository to maintain |
+| **A new sibling repository and package (decided)** | Its own tests, releases and pinned revision, like the libraries. Any application from the template can use it | One more repository to maintain |
 | A package inside stackr | One fewer repository | stackr becomes a library host, and its releases get tied to the stack's |
 | Generated code in the template only | Nothing to release | Every application owns a copy of code with idempotency and security invariants, and `copier update` has to merge fixes into code that has drifted |
 | Only in the product repository | Fastest start | Other applications can't reuse it, and the template can't generate it |
 | An extra in one library | No new package | Ruled out by reflexr ADR-0003: neither library imports the other |
 
-For the name: `bridgr` says what it does and fits the family's names. `relayr` also works. The maintainer chooses.
+The name is **relayr**: it relays events and commands between the two libraries, and fits the family's names. `bridgr` and `linkr` were considered; "link" already means trace and span links in this design.
 
 ### D2: the outbound actor
 
 | Option | For | Against |
 |---|---|---|
-| **`ExternalAgentActor`, one `client_id` per rule (recommended)** | artifactr's proposal rules apply as they do for any outside agent. Attribution is per rule | Rules are different participants, so the adapter must forbid resolving proposals itself |
+| **`ExternalAgentActor`, one `client_id` per rule (decided)** | artifactr's proposal rules apply as they do for any outside agent. Attribution is per rule | Rules are different participants, so the adapter must forbid resolving proposals itself |
 | `SystemActor` | Simple | Writes apply directly and can record run facts. Far more power than a rule needs |
 | artifactr's `AgentActor` | Looks like the thread's agent | Impersonates the chat agent, and mixes up artifactr's runs |
 | The rule's approver, as a user | People know who that is | Acts with a person's authority, and misattributes every write |
@@ -308,7 +310,7 @@ For the name: `bridgr` says what it does and fits the family's names. `relayr` a
 
 | Option | For | Against |
 |---|---|---|
-| **A thread is never a chain (recommended)** | Chains stay short, and chain measures (time to resolution, cost per chain) keep their meaning | Linking the two needs tags |
+| **A thread is never a chain (decided)** | Chains stay short, and chain measures (time to resolution, cost per chain) keep their meaning | Linking the two needs tags |
 | A thread is one chain | One id for everything | A chain that lasts weeks. `chain_events` returns the whole thread, and chain measures stop meaning anything |
 | A chain per turn | Groups the events one turn caused | The follower has to track turns. Could come later as a refinement |
 
@@ -316,7 +318,7 @@ For the name: `bridgr` says what it does and fits the family's names. `relayr` a
 
 | Option | For | Against |
 |---|---|---|
-| **Linked, not continued (recommended)** | No change to either library's session model. Scores stay with what they judge | Two sessions to open for one story, joined by tags and links |
+| **Linked, not continued (decided)** | No change to either library's session model. Scores stay with what they judge | Two sessions to open for one story, joined by tags and links |
 | One Langfuse session for a thread and the chains it starts | One view | Needs a session resolver port in reflexr, mixes chain and thread scores, and a chain fed by several threads has no single session |
 | The chain continues the conversation (shares the model history) | The agent sees everything | A second author inside the conversation, with none of the thread's review |
 
@@ -324,7 +326,7 @@ For the name: `bridgr` says what it does and fits the family's names. `relayr` a
 
 | Option | For | Against |
 |---|---|---|
-| **Artifact for review, reflexr's store for running, with provenance both ways (recommended)** | Reviewed and discussed where people work, and run where rules run | Two records to keep in step, so drift has to be detected |
+| **Artifact for review, reflexr's store for running, with provenance both ways (decided)** | Reviewed and discussed where people work, and run where rules run | Two records to keep in step, so drift has to be detected |
 | reflexr's store only; the artifact is a draft, archived once installed | One record | No review trail in the workspace, and people can't see or change a live rule from chat |
 | The artifact only; reflexr reads rules from artifactr | One record | reflexr would depend on artifactr at runtime, against ADR-0003 |
 
@@ -332,14 +334,14 @@ For the name: `bridgr` says what it does and fits the family's names. `relayr` a
 
 | Option | For | Against |
 |---|---|---|
-| **Prefix now (`artifactr.message_posted`), move to #45's namespaces later (recommended)** | Works today, since the registry accepts dotted names | A rename when #45 lands. Rules from chat will name these types, so the move needs a mapping |
-| Wait for #45 | Right the first time | Blocks phase 1 on a wire-format decision |
+| Prefix now (`artifactr.message_posted`), move to #45's namespaces later (recommended in the draft) | Works today, since the registry accepts dotted names | A rename when #45 lands. Rules from chat will name these types, so the move needs a mapping |
+| **Decide #45 first (decided)** | Right the first time: no rename, and no mapping for rules that name the old types | Phase 1 waits for a wire-format decision in reflexr |
 
 ### D7: may a rule start a turn?
 
 | Option | For | Against |
 |---|---|---|
-| **Notices by default; starting a turn is a per-rule permission (recommended)** | Most rules only need to inform people. Turns cost model calls and can loop | A rule that needs the agent must say so |
+| **Notices by default; starting a turn is a per-rule permission (decided)** | Most rules only need to inform people. Turns cost model calls and can loop | A rule that needs the agent must say so |
 | Every bridge message starts a turn, as messages from the surfaces do | Uniform | Each notice becomes a model call, and loops get much more likely |
 
 A notice is committed directly, without `Runner.send`, so it starts no turn. A notice posted while a turn is running is still passed to that turn, though, and nothing marks it as a notice for other clients. That gap is a prerequisite.
@@ -348,7 +350,7 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 
 | Prerequisite | Library | Issue | Needed by | Until then |
 |---|---|---|---|---|
-| Namespaced event types | reflexr | [#45][r-45] | phase 1 (can start without it) | the `artifactr.` prefix (D6) |
+| Namespaced event types | reflexr | [#45][r-45] | phase 1 (D6) | phase 1 waits |
 | Runtime rule management: per-tenant, versioned, installed through the API, not listed to other tenants | reflexr | [#21][r-21] | phase 5 | no rules from chat |
 | Telemetry setup that composes across both libraries, polling without a trace per poll, and mirror cursors | reflexr, artifactr | [reflexr #62][r-62], [artifactr #50][a-50] | phase 4 | links and tags, without the combined setup |
 | `traceparent` on artifactr envelopes | artifactr | issue to be filed on sign-off | phase 4, for links in the artifactr-to-reflexr direction | tags only, in that direction |
@@ -361,7 +363,7 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 
 | Phase | Deliverable | Exit criteria |
 |---|---|---|
-| 1. Inbound adapter | The package, the bridged event types, the follower with its lease, cursor and dead letters, and the ledger with both adapters | An artifactr message fires a reflexr rule exactly once, across a restart and a redelivery |
+| 1. Inbound adapter (after reflexr #45) | The relayr package, the bridged event types, the follower with its lease, cursor and dead letters, and the ledger with both adapters | An artifactr message fires a reflexr rule exactly once, across a restart and a redelivery |
 | 2. Outbound adapter and loop control | The capability and helpers, allowlists, derived ids, keyed patches, read-back, and chain continuation | Under forced retries, a rule's proposal and notice each appear once. Two rules that answer each other stop at the depth limit |
 | 3. Template option, example and smoke test | The `bridge` question, the incident timeline example, and `make smoke-app` extended | A generated application passes its CI, and the smoke test sees an event cross each way |
 | 4. Telemetry links and tags | Span links, `thread:` and `chain:` tags, and the Langfuse user (after reflexr #62 and artifactr #50) | In Tempo, a turn started by a run links to the run's span. In Langfuse, each session carries the other's tag |
@@ -397,7 +399,8 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 
 ## Tracking
 
-- [ ] Sign-off on D1 to D7
+- [x] Sign-off on D1 to D7 (2026-09-29)
+- [ ] Decide reflexr #45's namespaces
 - [ ] File the prerequisite issues: `traceparent` on artifactr envelopes, durable message idempotency, reserved publishers, workspace discovery, notices
 - [ ] Phase 1: inbound adapter
 - [ ] Phase 2: outbound adapter and loop control
