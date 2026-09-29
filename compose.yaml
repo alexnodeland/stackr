@@ -242,7 +242,7 @@ services:
   # `noeviction`, because queued jobs must not be dropped; the gateway's
   # entries expire by their TTLs.
   redis:
-    image: valkey/valkey:9.0.6-alpine
+    image: valkey/valkey:9.1.2-alpine
     profiles: [langfuse, gateway]
     restart: unless-stopped
     # The password goes into a config file, never onto the command line.
@@ -288,7 +288,7 @@ services:
       retries: 30
 
   clickhouse:
-    image: clickhouse/clickhouse-server:26.8.14
+    image: clickhouse/clickhouse-server:26.9.2.8
     profiles: [langfuse]
     restart: unless-stopped
     user: "101:101"
