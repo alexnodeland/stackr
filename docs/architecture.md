@@ -225,13 +225,13 @@ A generated application:
 
 | Part | Where | What |
 |---|---|---|
-| Surfaces | `app.py`, `collaboration.py`, `automation.py` | FastAPI with each library's REST and WebSocket routes and MCP server under its name: `/artifactr/v1`, `/artifactr/mcp/`, `/reflexr/v1`, `/reflexr/mcp/`; the reactor runs while the application is up |
+| Surfaces | `app.py`, `collaboration.py`, `automation.py` | FastAPI with each library's REST and WebSocket routes and MCP server under its name: `/artifactr/v1`, `/artifactr/mcp/`, `/reflexr/v1`, `/reflexr/mcp/`; the reactor runs while the application is up, and stops gracefully with it, within the app profile's stop period |
 | Examples | `notes.py`, `tickets.py` | A `note` artifact type, its agent and a `rating` of turns; `ticket.opened` and `ticket.triaged` events, a `triage` rule, its agent, and a `triage-review` of runs |
 | Identity | `auth.py` | Supabase's access tokens, verified against its published keys (`AUTH_JWKS_URL`), or with a legacy HS256 secret (`AUTH_JWT_SECRET`); the user is `sub`, the tenant `app_metadata.tenant_id`; anything else is 401, the MCP servers included |
 | Database | `database.py` | The libraries' SQL storage on `DATABASE_URL`, migrated at startup, in a schema of the application's own (`DATABASE_SCHEMA`), since Supabase's Data API serves `public` |
 | Telemetry | `telemetry.py` | `configure_telemetry`, when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; Langfuse's client, when `LANGFUSE_PUBLIC_KEY` is set, for trace attributes and scores, while traces reach Langfuse through the Collector |
 | Gateway | `gateway.py` | Agents on `litellm_model("default")` with `LiteLLMGateway`: each request with its tenant's key and the `pii-mask` and `prompt-injection` guardrails |
-| Feedback | `scores.py` | A `FeedbackMirror` to Langfuse scores for each workspace the application uses, and the score configs, created at startup |
+| Feedback | `scores.py` | A `FeedbackMirror` to Langfuse scores for each workspace the application uses, a score per field by evalr's score mapping, and the score configs, created at startup |
 | Evals | `evals/` | The agents on a few examples, judged by evaluators of the feedback types: offline with a scripted model (`make evals`), or in Langfuse with the gateway's model (`make evals-langfuse`) |
 | Quality gates | `pyproject.toml`, `Makefile`, `.github/workflows/ci.yml`, `.pre-commit-config.yaml` | uv, ruff, pyright in strict mode, pytest with warnings as errors and 100% branch coverage, Conventional Commits; tests need no network or stack |
 | The `app` profile | `compose.yaml`, `Dockerfile`, `.env.example` | The application beside the stack (`make up`), on the `stackr` network and local Supabase's, where it reaches the stack's services by name |

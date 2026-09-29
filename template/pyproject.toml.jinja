@@ -42,6 +42,10 @@ build-backend = "uv_build"
 
 # The libraries are not on PyPI: each comes from its repository, pinned to a commit. To move to
 # a newer one, change its rev here (or answer again with `copier update`), then `uv lock`.
+{%- if evals %}
+# evalr's rev must be the commit the other libraries pin in their own sources, since their
+# [langfuse] extras require evalr too, and uv refuses two commits of one package.
+{%- endif %}
 [tool.uv.sources]
 {%- if use_artifactr %}
 artifactr-ai = { git = "https://github.com/alexnodeland/artifactr", rev = "{{ artifactr_rev }}" }

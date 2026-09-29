@@ -40,13 +40,13 @@ uvx copier copy --defaults --data libraries=reflexr --data evals=false gh:alexno
 
 | Part | Where | What |
 |---|---|---|
-| Surfaces | `app.py`, `collaboration.py`, `automation.py` | FastAPI with each library's REST and WebSocket routes and MCP server, under its name: `/artifactr/v1`, `/artifactr/mcp/`, `/reflexr/v1`, `/reflexr/mcp/`. reflexr's reactor runs while the application is up |
+| Surfaces | `app.py`, `collaboration.py`, `automation.py` | FastAPI with each library's REST and WebSocket routes and MCP server, under its name: `/artifactr/v1`, `/artifactr/mcp/`, `/reflexr/v1`, `/reflexr/mcp/`. reflexr's reactor runs while the application is up, and stops gracefully when it stops |
 | Examples | `notes.py`, `tickets.py` | A `note` artifact type, its agent and a `rating` of turns (artifactr); `ticket.opened` and `ticket.triaged` events, a `triage` rule, its agent, and a `triage-review` of runs (reflexr) |
 | Identity | `auth.py` | Supabase's access tokens, verified against its published keys (`AUTH_JWKS_URL`), or with a legacy HS256 secret (`AUTH_JWT_SECRET`). The user is `sub` and the tenant `app_metadata.tenant_id`; anything else is 401, the MCP servers included |
 | Database | `database.py` | The libraries' SQL storage on `DATABASE_URL`, migrated at startup, in a schema of the application's own (`DATABASE_SCHEMA`) |
 | Telemetry | `telemetry.py` | `configure_telemetry` when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; Langfuse's client when `LANGFUSE_PUBLIC_KEY` is set too, for trace attributes and scores |
-| Gateway | `gateway.py` | Agents on `litellm_model("default")`, each request with its tenant's key and the `pii-mask` and `prompt-injection` guardrails |
-| Feedback | `scores.py` | Each workspace's feedback mirrored to Langfuse scores, from the first request that uses it, and the feedback types' score configs, created at startup |
+| Gateway | `gateway.py` | Agents on `litellm_model("default")`, each request with its tenant's key and the `pii-mask` and `prompt-injection` guardrails. A mocked reply, for smoke tests, is in the model's settings |
+| Feedback | `scores.py` | Each workspace's feedback mirrored to Langfuse scores, a score per field by evalr's score mapping, from the first request that uses it, and the feedback types' score configs, created at startup |
 | Evals | `evals/` | The agents on a few examples, judged by evaluators whose verdicts are the application's own feedback types: offline with a scripted model (`make evals`), or in Langfuse with the gateway's model (`make evals-langfuse`) |
 | Quality gates | `pyproject.toml`, `Makefile`, `.github/workflows/ci.yml`, `.pre-commit-config.yaml` | uv, ruff, pyright in strict mode, pytest with warnings as errors and 100% branch coverage, Conventional Commits. The tests need no network and no stack |
 | The `app` profile | `compose.yaml`, `Dockerfile` | The application beside the stack, on its networks |
@@ -90,6 +90,8 @@ The **app profile** is the application's own `compose.yaml`, not a service in st
 
 So start the stack first, with local Supabase: stackr's default `make up`. The image is built in two stages, the first with git to fetch the libraries at their pinned commits, so building it needs the network.
 
+**Stopping** gives the application 10 seconds from `SIGTERM` (`stop_grace_period`, Docker's default, stated in the compose file). With reflexr, the reactor stops first, before the database closes, and never in the middle of a transaction: it starts no new runs, and gives running actions `STOP_GRACE` (5 seconds, in `automation.py`) to end. An action still running then is cancelled between its storage calls, its attempt recorded as abandoned, and its lease let go, so the next start retries the run after its rule's backoff ([reflexr's graceful stop](https://github.com/alexnodeland/reflexr/blob/main/docs/guides/reactor.md#running-the-reactor)). Keep the grace below the stop period, less the rest of the shutdown; `create_app(grace=...)` sets another.
+
 The **dev container** is built on `.devcontainer/compose.yaml`. When the stack is running, its `initialize.sh` adds the stack's networks and the same addresses, so the application inside it reaches the stack by name; otherwise the dev container runs on its own.
 
 ## Keeping it up to date
@@ -112,7 +114,7 @@ uvx copier update --defaults --data artifactr_rev=<commit SHA>   # through Copie
 uv lock && make check
 ```
 
-A revision is a full 40-character commit SHA. When an application uses reflexr's `[evals]` extra, it declares evalr's source itself, since reflexr's `[tool.uv.sources]` doesn't apply to the application's own requirements. It pins the commit reflexr's sources pin, since uv resolves reflexr's own requirement on evalr with them and refuses two URLs for one package, so move evalr with reflexr.
+A revision is a full 40-character commit SHA. Every application installs evalr: artifactr's and reflexr's `[langfuse]` extras require it, for their score mapping, and so does reflexr's `[evals]`. Each library pins evalr in its own `[tool.uv.sources]`, and uv resolves the library's requirements with them. An application with evals requires evalr itself, so it declares evalr's source too, since a library's sources don't apply to the application's own requirements. It pins the commit the libraries pin, since uv refuses two URLs for one package, so move evalr with them.
 
 ### In stackr: bumping the template's defaults
 
@@ -132,7 +134,7 @@ artifactr e890aca037c0 → 9c92a7f7685d  https://github.com/alexnodeland/artifac
 
 Naming libraries moves only those; a commit SHA must be a full 40 characters, and is checked against the library's repository.
 
-**evalr follows reflexr.** The template installs reflexr's `[evals]` extra, and uv resolves reflexr's requirement on evalr with reflexr's own `[tool.uv.sources]`, which pins evalr to a commit. An application whose own evalr pin names another commit has two URLs for one package, and uv refuses to lock it. So the script pins evalr to the commit the new reflexr pins, not to evalr's `main`, and says so when the two differ; evalr moves when reflexr moves its pin. Asking for another evalr commit is an error.
+**evalr follows artifactr and reflexr.** The template installs their `[langfuse]` extras, and reflexr's `[evals]`, which require evalr, and uv resolves each library's requirement on evalr with the library's own `[tool.uv.sources]`, which pins evalr to a commit. An application whose own evalr pin names another commit has two URLs for one package, and uv refuses to lock it. So the script pins evalr to the commit the new artifactr and reflexr pin, not to evalr's `main`, and says so when the two differ; evalr moves when they move their pins. When artifactr and reflexr pin different commits, no application with both can be locked, and the script stops. Asking for another evalr commit is an error.
 
 Then run `make validate`, and open a pull request with the output in its description: CI's template job generates every variant on the new revisions and runs its checks, and the smoke job runs an application on them beside the stack. When a library's `main` breaks the template, either fix the template in the same pull request, or pin that library to its last good commit.
 

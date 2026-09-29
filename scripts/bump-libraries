@@ -19,10 +19,12 @@ A REV is a branch, a tag or a full 40-character commit SHA; a SHA is checked by 
 commit alone from the library's repository. Naming libraries moves only those. With `--check`
 nothing is written, and the script exits 1 when a pin is not at its target.
 
-evalr follows reflexr. The template installs reflexr's `[evals]` extra, and uv resolves it with
-reflexr's own `[tool.uv.sources]`, which pins evalr to a commit; an application that pins evalr
-anywhere else has two URLs for one package, and uv refuses it. So evalr's target is the commit
-the pinned reflexr's pyproject.toml names, not evalr's main, for as long as reflexr pins one.
+evalr follows artifactr and reflexr. The template installs their `[langfuse]` extras, and
+reflexr's `[evals]`, which require evalr, and uv resolves each library's requirements with its
+own `[tool.uv.sources]`, which pins evalr to a commit; an application that pins evalr anywhere
+else has two URLs for one package, and uv refuses it. So evalr's target is the commit the pinned
+libraries' pyproject.toml files name, not evalr's main, for as long as they pin one. When the two
+libraries pin different commits, no application with both can be locked, and the script stops.
 
 Applications already generated keep the revisions they were generated with; the template's
 guide says how they move theirs.
@@ -38,14 +40,15 @@ import tempfile
 import tomllib
 import urllib.error
 import urllib.request
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 LIBRARIES = ("artifactr", "reflexr", "evalr")
 REPOSITORY = "https://github.com/alexnodeland/{library}"
 PYPROJECT = "https://raw.githubusercontent.com/alexnodeland/{library}/{sha}/pyproject.toml"
-# A library the template installs through another's extra, and so pins where that one does.
-FOLLOWS = {"evalr": "reflexr"}
+# A library the template installs through others' extras, and so pins where they do.
+FOLLOWS: dict[str, tuple[str, ...]] = {"evalr": ("artifactr", "reflexr")}
 ROOT = Path(__file__).resolve().parent.parent
 COPIER = ROOT / "copier.yml"
 SHA = re.compile(r"[0-9a-f]{40}")
@@ -129,6 +132,26 @@ def pinned_by(leader: str, sha: str, library: str) -> str | None:
     return resolve(library, rev)
 
 
+def agreed(library: str, leaders: Sequence[str], pins: Mapping[str, str]) -> Mapping[str, str]:
+    """The leaders, at their pins, that pin `library`, each with its commit, if all agree on one.
+
+    Raises SystemExit when two pin different commits: an application with both can't be locked.
+    """
+    pinned = {
+        leader: sha for leader in leaders if (sha := pinned_by(leader, pins[leader], library))
+    }
+    if len(set(pinned.values())) > 1:
+        each = "; ".join(
+            f"{leader} {pins[leader][:SHORT]} pins {sha[:SHORT]}" for leader, sha in pinned.items()
+        )
+        raise SystemExit(
+            f"bump-libraries: {library}: the libraries that install it pin different commits "
+            f"({each}), so no application with both can be locked; hold one back with "
+            "LIBRARY=REV until they agree"
+        )
+    return pinned
+
+
 def compare_url(library: str, old: str, new: str) -> str:
     return f"{REPOSITORY.format(library=library)}/compare/{old[:SHORT]}...{new[:SHORT]}"
 
@@ -161,25 +184,28 @@ def main() -> int:
     text = COPIER.read_text()
     old = {library: current_pin(text, library) for library in LIBRARIES}
     new = dict(old)
-    # In LIBRARIES' order, so a library another follows is resolved first.
+    # In LIBRARIES' order, so the libraries another follows are resolved first.
     for library in LIBRARIES:
-        leader = FOLLOWS.get(library)
-        required = None
-        if leader is not None and (leader in targets or library in targets):
-            required = pinned_by(leader, new[leader], library)
-        if required is None:
+        leaders = FOLLOWS.get(library, ())
+        pinned: Mapping[str, str] = {}
+        if library in targets or any(leader in targets for leader in leaders):
+            pinned = agreed(library, leaders, new)
+        if not pinned:
             if library in targets:
                 new[library] = resolve(library, targets[library])
             continue
+        required = next(iter(pinned.values()))
         if library in targets and (wanted := resolve(library, targets[library])) != required:
-            at = f"{required[:SHORT]}, the commit {leader} {new[leader][:SHORT]} pins"
+            through = " and ".join(pinned)
+            by = " and ".join(f"{leader} {new[leader][:SHORT]}" for leader in pinned)
+            at = f"{required[:SHORT]}, the commit {by} {'pin' if len(pinned) > 1 else 'pins'}"
             if library in named:
                 raise SystemExit(
-                    f"bump-libraries: {library}={named[library]}: the template installs "
-                    f"{leader}'s extra, so {library} must be at {at}; move {leader} to a commit "
-                    f"that pins {library} where you want it, and {library} follows"
+                    f"bump-libraries: {library}={named[library]}: the template installs it "
+                    f"through {through}, so {library} must be at {at}; move them to commits "
+                    f"that pin {library} where you want it, and {library} follows"
                 )
-            say(f"{library} follows {leader}: {at} ({targets[library]} is {wanted[:SHORT]})")
+            say(f"{library} follows {through}: {at} ({targets[library]} is {wanted[:SHORT]})")
         new[library] = required
 
     moved = [library for library in LIBRARIES if new[library] != old[library]]

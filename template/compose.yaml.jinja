@@ -14,6 +14,14 @@ services:
     build: .
     image: {{ project_slug }}:local
     restart: unless-stopped
+{%- if use_reflexr %}
+    # How long it has to stop, from SIGTERM, before it is killed (Docker's default). The
+    # reactor's grace for running actions (STOP_GRACE in automation.py, 5 seconds) ends within
+    # it, with time left for the rest of the shutdown.
+{%- else %}
+    # How long it has to stop, from SIGTERM, before it is killed (Docker's default).
+{%- endif %}
+    stop_grace_period: 10s
     env_file:
       - path: .env
         required: false
