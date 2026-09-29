@@ -28,7 +28,7 @@ from {{ package_name }}.gateway import Guardrails, TenantKeys
 from {{ package_name }}.notes import Note, Rating, build_note_agent
 from {{ package_name }}.scores import Mirrors, sync_configs
 from {{ package_name }}.settings import GatewaySettings
-from {{ package_name }}.telemetry import Telemetry
+from {{ package_name }}.telemetry import TelemetryHandle
 
 PREFIX = "/artifactr"
 
@@ -53,7 +53,7 @@ class Collaboration:
         model: Model,
         gateway: GatewaySettings,
         engine: AsyncEngine | None = None,
-        telemetry: Telemetry | None = None,
+        telemetry: TelemetryHandle | None = None,
     ) -> None:
         self._verifier = verifier
         tracer_provider = telemetry.tracer_provider if telemetry else None

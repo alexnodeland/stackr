@@ -1,6 +1,6 @@
 # ADR-0011: The application template, in detail
 
-**Status:** Accepted
+**Status:** Accepted; partly superseded by [ADR-0013](0013-how-the-template-pins-the-libraries.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 
@@ -101,7 +101,7 @@ The maintainer decided to keep the libraries on GitHub rather than publish them 
 
 ## Amendment (2026-09-29): the reactor stops gracefully, and the libraries' fixes for the template
 
-The libraries fixed the rough edges the template found, and `make bump-libraries` moved it onto them: artifactr from `9c92a7f` to `6ec0bce`, reflexr from `f91a894` to `2f28e23`, and evalr from `62582e2` to `c6866c4`. One of them changes how the application stops:
+The libraries fixed the rough edges the template found, and `make bump-libraries` moved it onto them: artifactr from `9c92a7f` to `6ec0bce`, and reflexr from `f91a894` to `2f28e23`. One of them changes how the application stops:
 
 - **The reactor stops gracefully, before the rest.** `Automation.lifespan` creates an `asyncio.Event`, runs `reactor.serve(poll_interval=..., stop=stop, grace=...)` in a task, and at shutdown sets the event and awaits the task, before the feedback mirrors, the MCP server and the database close. Cancelling the task, as the template did, landed wherever the reactor was, in a transaction too; on SQLite that left the connection holding the write lock, and the lease release that followed failed with "database is locked", which the template caught and logged ([#17](https://github.com/alexnodeland/stackr/pull/17)). reflexr's `serve(stop=)` ([reflexr#69](https://github.com/alexnodeland/reflexr/pull/69)) never interrupts a transaction: it starts nothing new, gives running actions `grace` to end, then cancels them between their storage calls, records each attempt as abandoned, to be retried after the rule's backoff, and lets go of its leases. So the catch and its log are gone, and a test stops an application on SQLite with a run in flight and checks that nothing is logged and that the next start retries the run.
 - **The grace is 5 seconds, within a 10-second stop period.** `STOP_GRACE` in `automation.py`, which `create_app(grace=)` overrides; the app profile's compose file states `stop_grace_period: 10s`, Docker's default, beside it, so the two are read together.
@@ -110,10 +110,6 @@ The rest changes no structure:
 
 - **The gateway's model carries the mocked reply.** `litellm_model` takes model settings ([artifactr#57](https://github.com/alexnodeland/artifactr/pull/57), [reflexr#68](https://github.com/alexnodeland/reflexr/pull/68)), so `gateway_model` puts `LITELLM_MOCK_RESPONSE` in the model's settings, and the agents and the experiments take no model settings of their own.
 - **MCP resolvers without a cast.** artifactr's resolver takes its `McpContext`, whose request is typed ([artifactr#57](https://github.com/alexnodeland/artifactr/pull/57)). reflexr has no such type, so its resolver is typed with the MCP SDK's `Context[Any, Request]`, which reflexr's bare `Context` accepts. As both libraries' guides show, each resolver refuses a call without an HTTP request, as one made in process has, with the SDK's `ToolError`, and hands the request to `TokenVerifier.authenticate`.
+- **The libraries' telemetry handle.** The parts take `configure_telemetry`'s `TelemetryHandle`, artifactr's when both libraries are there, in place of the template's own protocol for it.
 - **A scripted model that streams.** The tests' `Script` and the offline experiments use `artifactr.agent.function_model` where artifactr is installed. reflexr's agents stream too, since `LiteLLMGateway` wraps each run's event stream, and reflexr has no `function_model`, so the reflexr-only variant keeps its own stream function.
 - **Scores are evalr's.** The libraries' feedback mirrors now build on evalr's score mapping and ports ([artifactr#59](https://github.com/alexnodeland/artifactr/pull/59), [reflexr#70](https://github.com/alexnodeland/reflexr/pull/70), [evalr#32](https://github.com/alexnodeland/evalr/pull/32)). The template builds no `Score` and implements no sink, so only its tests changed: they check each score's value, data type and source, and that a yes or no reaches Langfuse as 1.
-- **evalr follows artifactr and reflexr.** Both libraries' `[langfuse]` extras now require evalr, each pinned in the library's own `[tool.uv.sources]`, so every application installs evalr, and an application with evals must pin the commit both libraries pin. `scripts/bump-libraries` pins evalr where both pin it, and stops when they differ, since no application with both libraries could then be locked. This extends the amendment above, where evalr followed reflexr alone.
-- **Checked, and nothing to adopt:**
-  - artifactr carries out commands once per id on every surface ([artifactr#56](https://github.com/alexnodeland/artifactr/pull/56)) and dropped `artifactr_router(remembered_commands=)`, which the template never passed.
-  - The log's new reads ([artifactr#58](https://github.com/alexnodeland/artifactr/pull/58), [reflexr#67](https://github.com/alexnodeland/reflexr/pull/67)): the application doesn't read the log, and its tests already filter reflexr's reads by type.
-  - Building an MCP server no longer configures the process's logging ([reflexr#73](https://github.com/alexnodeland/reflexr/pull/73), [artifactr#64](https://github.com/alexnodeland/artifactr/pull/64)). The template configures none either: without telemetry, its warnings reach stderr through Python's last-resort handler, and its info lines, which the MCP SDK's handler printed, no longer show; with telemetry, its warnings reach the Collector alone, as before.

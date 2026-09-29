@@ -38,7 +38,7 @@ from {{ package_name }}.collaboration import Collaboration
 from {{ package_name }}.database import create_schema, open_database
 from {{ package_name }}.gateway import gateway_model
 from {{ package_name }}.settings import Settings
-from {{ package_name }}.telemetry import Telemetry, configure
+from {{ package_name }}.telemetry import TelemetryHandle, configure
 
 TITLE = {{ project_name | tojson }}
 DISTRIBUTION = "{{ project_slug }}"
@@ -64,7 +64,7 @@ def create_app(
     settings: Settings | None = None,
     *,
     model: Model | None = None,
-    telemetry: Telemetry | None = None,
+    telemetry: TelemetryHandle | None = None,
 {%- if use_reflexr %}
     poll_interval: timedelta = timedelta(seconds=1),
     grace: timedelta = STOP_GRACE,

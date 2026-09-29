@@ -33,7 +33,7 @@ from {{ package_name }}.auth import RequireToken, TokenVerifier, Unauthenticated
 from {{ package_name }}.gateway import Guardrails, TenantKeys
 from {{ package_name }}.scores import Mirrors, sync_configs
 from {{ package_name }}.settings import GatewaySettings
-from {{ package_name }}.telemetry import Telemetry
+from {{ package_name }}.telemetry import TelemetryHandle
 from {{ package_name }}.tickets import (
     EVENTS,
     RULES,
@@ -71,7 +71,7 @@ class Automation:
         model: Model,
         gateway: GatewaySettings,
         engine: AsyncEngine | None = None,
-        telemetry: Telemetry | None = None,
+        telemetry: TelemetryHandle | None = None,
         poll_interval: timedelta = timedelta(seconds=1),
         grace: timedelta = STOP_GRACE,
     ) -> None:

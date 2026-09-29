@@ -40,21 +40,15 @@ dev = [
 requires = ["uv_build>=0.12,<0.13"]
 build-backend = "uv_build"
 
-# The libraries are not on PyPI: each comes from its repository, pinned to a commit. To move to
-# a newer one, change its rev here (or answer again with `copier update`), then `uv lock`.
-{%- if evals %}
-# evalr's rev must be the commit the other libraries pin in their own sources, since their
-# [langfuse] extras require evalr too, and uv refuses two commits of one package.
-{%- endif %}
+# The libraries are not on PyPI: each comes from its repository, pinned to a commit, and evalr
+# comes with them, at the commit their own sources pin. `copier update` moves the pins with the
+# template; to hold a library back, change its rev here, then `uv lock`.
 [tool.uv.sources]
 {%- if use_artifactr %}
 artifactr-ai = { git = "https://github.com/alexnodeland/artifactr", rev = "{{ artifactr_rev }}" }
 {%- endif %}
 {%- if use_reflexr %}
 reflexr = { git = "https://github.com/alexnodeland/reflexr", rev = "{{ reflexr_rev }}" }
-{%- endif %}
-{%- if evals %}
-evalr = { git = "https://github.com/alexnodeland/evalr", rev = "{{ evalr_rev }}" }
 {%- endif %}
 
 # ─── lint and format ──────────────────────────────────────────────────────────

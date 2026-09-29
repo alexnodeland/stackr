@@ -26,7 +26,8 @@ make check          # lint, types and tests, as its CI runs them
 | `evals` | Yes | An `evals/` directory with starter evalr experiments |
 | `python_version` | 3.12 | 3.12, 3.13 or 3.14 |
 | `app_port` | 8800 | The port the application is published on, on this machine |
-| `artifactr_rev`, `reflexr_rev`, `evalr_rev` | Each library's `main` when the template was last updated | The git commit each library is pinned to, since none is on PyPI yet |
+
+The libraries' revisions aren't questions: the template pins each library to the commit its code was written for ([The libraries' revisions](#the-libraries-revisions)).
 
 Answer non-interactively with `--defaults` and `--data`, as CI does:
 
@@ -34,7 +35,7 @@ Answer non-interactively with `--defaults` and `--data`, as CI does:
 uvx copier copy --defaults --data libraries=reflexr --data evals=false gh:alexnodeland/stackr my-app
 ```
 
-[Template questions](../reference/template.md) lists every question with its choices, validation and the files each answer generates.
+[Template questions](../reference/template.md) lists every question with its choices, validation and the files each answer generates, and the values derived from them.
 
 ## What it generates
 
@@ -106,19 +107,13 @@ pulls in the template's improvements since the application was generated, keepin
 
 ### The libraries' revisions
 
-Each library is pinned to a commit in `pyproject.toml`'s `[tool.uv.sources]`. `copier update` keeps the revisions you answered, even when the template's defaults move on, so to move a library forward, change its revision yourself:
+artifactr and reflexr are pinned to commits in `pyproject.toml`'s `[tool.uv.sources]` ([ADR-0013](../adr/0013-how-the-template-pins-the-libraries.md)). The pins are the template's, not answers, so `copier update` moves them with the template code written for them. evalr has no pin of its own: it comes with the libraries, at the commit their own `[tool.uv.sources]` pin.
 
-```bash
-uvx copier update --defaults --data artifactr_rev=<commit SHA>   # through Copier, recorded in the answers
-# or edit the rev in pyproject.toml's [tool.uv.sources]
-uv lock && make check
-```
-
-A revision is a full 40-character commit SHA. Every application installs evalr: artifactr's and reflexr's `[langfuse]` extras require it, for their score mapping, and so does reflexr's `[evals]`. Each library pins evalr in its own `[tool.uv.sources]`, and uv resolves the library's requirements with them. An application with evals requires evalr itself, so it declares evalr's source too, since a library's sources don't apply to the application's own requirements. It pins the commit the libraries pin, since uv refuses two URLs for one package, so move evalr with them.
+To hold a library back, or try another commit, edit its `rev` there, then `uv lock && make check`. `copier update` keeps the edit, and marks a conflict when the template moves the same pin.
 
 ### In stackr: bumping the template's defaults
 
-The libraries install from GitHub rather than PyPI for now ([artifactr#23](https://github.com/alexnodeland/artifactr/issues/23)), so the template's `*_rev` defaults in `copier.yml` follow each library's `main` by hand. `make bump-libraries` does it:
+The libraries install from GitHub rather than PyPI for now ([artifactr#23](https://github.com/alexnodeland/artifactr/issues/23)), so the template's pins, `artifactr_rev` and `reflexr_rev` in `copier.yml`, follow each library's `main` by hand. `make bump-libraries` does it:
 
 ```bash
 make bump-libraries                                  # every library, to the commit its main points to
@@ -126,7 +121,7 @@ make bump-libraries BUMP_FLAGS=--check               # change nothing; fail if a
 make bump-libraries BUMP_FLAGS="artifactr=v0.1.0"    # artifactr only, to a tag, a branch or a commit SHA
 ```
 
-It runs `scripts/bump-libraries`, which resolves each library's `main` with `git ls-remote`, rewrites the defaults in `copier.yml`, regenerates the reference pages that show them (`make docs-reference`), and prints each pin it moved, with a link to what changed:
+It runs `scripts/bump-libraries`, which resolves each library's `main` with `git ls-remote`, rewrites the pins in `copier.yml`, regenerates the reference pages that show them (`make docs-reference`), and prints each pin it moved, with a link to what changed:
 
 ```text
 artifactr e890aca037c0 → 9c92a7f7685d  https://github.com/alexnodeland/artifactr/compare/e890aca037c0...9c92a7f7685d
@@ -134,11 +129,11 @@ artifactr e890aca037c0 → 9c92a7f7685d  https://github.com/alexnodeland/artifac
 
 Naming libraries moves only those; a commit SHA must be a full 40 characters, and is checked against the library's repository.
 
-**evalr follows artifactr and reflexr.** The template installs their `[langfuse]` extras, and reflexr's `[evals]`, which require evalr, and uv resolves each library's requirement on evalr with the library's own `[tool.uv.sources]`, which pins evalr to a commit. An application whose own evalr pin names another commit has two URLs for one package, and uv refuses to lock it. So the script pins evalr to the commit the new artifactr and reflexr pin, not to evalr's `main`, and says so when the two differ; evalr moves when they move their pins. When artifactr and reflexr pin different commits, no application with both can be locked, and the script stops. Asking for another evalr commit is an error.
+evalr moves when the libraries move their pins of it. When artifactr and reflexr pin different commits of evalr, `uv lock` fails in the Template jobs, naming both.
 
 Then run `make validate`, and open a pull request with the output in its description: CI's template job generates every variant on the new revisions and runs its checks, and the smoke job runs an application on them beside the stack. When a library's `main` breaks the template, either fix the template in the same pull request, or pin that library to its last good commit.
 
-Nothing runs this on a schedule, and CI doesn't run `--check`, which would fail every pull request as soon as a library merged something. Applications already generated keep their revisions until they move them, as above.
+Nothing runs this on a schedule, and CI doesn't run `--check`, which would fail every pull request as soon as a library merged something. Applications move to the new pins with `copier update`.
 
 ## How the template is checked
 

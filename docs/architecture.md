@@ -212,14 +212,7 @@ cd my-app && git init && make install && make env && make check
 uvx copier update                                # later: the template's improvements
 ```
 
-| Question | Default | What it decides |
-|---|---|---|
-| `project_name`, `project_slug`, `description` | My App, `my-app` | The distribution, the package (`my_app`), the OpenTelemetry service and the Compose project |
-| `libraries` | `both` | `artifactr`, `reflexr`, or both side by side on one database and one telemetry setup |
-| `evals` | yes | An `evals/` directory with starter evalr experiments |
-| `python_version` | 3.12 | 3.12, 3.13 or 3.14 |
-| `app_port` | 8800 | The port the application is published on |
-| `artifactr_rev`, `reflexr_rev`, `evalr_rev` | Each library's `main` when the template was last updated, by `make bump-libraries` | The git revision `[tool.uv.sources]` pins, since the libraries aren't on PyPI |
+It asks for the application's name, slug and description, which libraries it uses (`artifactr`, `reflexr` or `both`), whether to include evals, the Python version and the published port; [Template questions](reference/template.md) lists each, generated from `copier.yml`. The libraries' revisions aren't questions: the template pins artifactr and reflexr to commits, which `make bump-libraries` moves to each library's `main` and `copier update` carries to applications, and evalr comes with them at the commit their own sources pin ([ADR-0013](adr/0013-how-the-template-pins-the-libraries.md)).
 
 A generated application:
 
