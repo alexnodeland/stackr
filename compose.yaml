@@ -306,7 +306,7 @@ services:
       retries: 30
 
   langfuse-worker:
-    image: langfuse/langfuse-worker:4.46.0
+    image: langfuse/langfuse-worker:4.50.0
     profiles: [langfuse]
     restart: unless-stopped
     environment:
