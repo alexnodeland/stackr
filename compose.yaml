@@ -100,7 +100,7 @@ services:
       - loki
 
   tempo:
-    image: grafana/tempo:3.0.3
+    image: grafana/tempo:3.1.0
     profiles: [observability]
     restart: unless-stopped
     command: ["-config.file=/etc/tempo/tempo.yaml"]
