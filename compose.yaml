@@ -79,7 +79,7 @@ services:
   # The telemetry port: every application, and the LiteLLM proxy, sends OTLP
   # here. Swapping a backend changes the Collector's exporters only.
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.161.0
+    image: otel/opentelemetry-collector-contrib:0.161.0-386
     profiles: [observability]
     restart: unless-stopped
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
