@@ -266,7 +266,7 @@ services:
   # The S3 port, with MinIO as its adapter. Chainguard publishes only
   # `latest` for free, so the image is pinned by digest (ADR-0008).
   minio:
-    image: cgr.dev/chainguard/minio:latest@sha256:71674988a1c7ddd5724928633199152b11e4ddefd6c6ce2d60772ff4a8f22ca9
+    image: cgr.dev/chainguard/minio:latest@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716dd3c4247e0babc32864b8ee8e0034
     profiles: [langfuse]
     restart: unless-stopped
     entrypoint:
