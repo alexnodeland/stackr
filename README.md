@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> **stackr has moved to [lattice](https://github.com/alexnodeland/lattice/tree/main/packages/stackr).** It is developed there now, alongside artifactr, reflexr, evalr, relayr, grantr and portalr, and released as images on GHCR alongside its application template. Docs are at [lattice.alexnodeland.com/stackr](https://lattice.alexnodeland.com/stackr/). This repository is archived and kept for its history.
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/banner-dark.svg">
   <img alt="stackr: the stack artifactr, reflexr and evalr run on: LiteLLM, OpenTelemetry, Langfuse and Supabase." src="docs/assets/brand/banner-light.svg" width="100%">
